@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="zh-Hant"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>板塊競技場</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#0b1120; --panel:#111a2e; --ink:#e2e8f0; --dim:#94a3b8; }
+  * { box-sizing:border-box; margin:0; }
+  body { background:radial-gradient(1200px 500px at 50% -10%,#16224a 0%,var(--bg) 55%);
+         color:var(--ink); min-height:100vh;
+         font-family:'Noto Sans TC',system-ui,sans-serif; padding:20px 14px 40px; }
+  /* CRT 掃描線 */
+  body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:99;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,.14) 0 1px,transparent 1px 3px); }
+  .wrap { max-width:1080px; margin:0 auto; }
+  h1 { font-family:'Press Start 2P',monospace; font-size:clamp(16px,3.5vw,26px);
+        text-align:center; letter-spacing:2px; margin:10px 0 4px;
+        color:#fbbf24; text-shadow:0 0 12px rgba(251,191,36,.45),0 0 40px rgba(251,191,36,.2);
+        animation:flick 4s infinite; }
+  .sub { text-align:center; color:var(--dim); font-size:13px; margin-bottom:18px; }
+  .battle-tag { font-family:'Press Start 2P',monospace; font-size:10px; color:#f87171;
+                 text-align:center; letter-spacing:3px; margin-bottom:6px;
+                 animation:blink 1.4s step-end infinite; }
+  .versus { display:flex; align-items:center; justify-content:center; gap:16px;
+             background:linear-gradient(90deg,rgba(239,68,68,.16),transparent 40%,
+             transparent 60%,rgba(13,148,136,.18)); border:1px solid #334155;
+             border-radius:14px; padding:16px 10px 14px; margin-bottom:24px;
+             flex-wrap:wrap; box-shadow:inset 0 0 30px rgba(0,0,0,.4); }
+  .versus .who { font-weight:700; font-size:clamp(13px,2.4vw,17px); text-align:center; }
+  .versus .who .num { display:block; font-family:'Press Start 2P',monospace;
+                       font-size:clamp(14px,3vw,20px); margin-top:6px; }
+  .versus .vs { font-family:'Press Start 2P',monospace; color:#fbbf24; font-size:18px;
+                 text-shadow:0 0 10px rgba(251,191,36,.6); animation:vsPulse 1s infinite; }
+  @keyframes grow { from { width:0; } }
+  @keyframes pop { from { opacity:0; transform:translateY(14px) scale(.97); } }
+  @keyframes blink { 50% { opacity:0; } }
+  @keyframes flick { 0%,93%,97%,100% { opacity:1; } 95% { opacity:.55; } }
+  @keyframes vsPulse { 50% { transform:scale(1.18); } }
+  @keyframes goldGlow { 0%,100% { box-shadow:0 0 10px rgba(251,191,36,.22); }
+                         50% { box-shadow:0 0 22px rgba(251,191,36,.5); } }
+  .tier-head { font-family:'Press Start 2P',monospace; font-size:13px;
+                margin:26px 0 10px; display:flex; align-items:center; gap:10px; }
+  .tier-letter { font-size:22px; }
+  .tier-n { color:var(--dim); font-family:'Noto Sans TC'; font-size:12px; }
+  /* ══ 小兵戰場 ══ */
+  .battlefield { background:var(--panel); border:1px solid #1e293b;
+                  border-radius:14px; padding:6px 12px; }
+  .lane { display:flex; align-items:center; gap:10px; padding:8px 0;
+           border-bottom:1px dashed #1e293b; animation:pop .5s ease both; }
+  .lane:last-child { border-bottom:none; }
+  .lane:nth-child(3) { animation-delay:.06s; } .lane:nth-child(4) { animation-delay:.12s; }
+  .lane:nth-child(5) { animation-delay:.18s; } .lane:nth-child(6) { animation-delay:.24s; }
+  .lname { flex:0 0 150px; font-size:13.5px; font-weight:700; line-height:1.35; }
+  .mini { font-size:10.5px; font-weight:400; border-radius:999px;
+           padding:1px 6px; background:#1e293b; white-space:nowrap; }
+  .mini.hot { background:rgba(239,68,68,.2); }
+  .mini.cold { background:rgba(96,165,250,.18); }
+  .mini.zap { background:rgba(251,191,36,.18); }
+  .field { flex:1; position:relative; height:34px; overflow:hidden;
+            background:linear-gradient(90deg,rgba(239,68,68,.07),transparent 45%,
+              transparent 55%,rgba(13,148,136,.09));
+            border-radius:8px; }
+  .field::before { content:""; position:absolute; left:50%; top:4px; bottom:4px;
+            border-left:1px dashed #334155; }  /* 0% 中線 */
+  .army { position:absolute; top:50%; transform:translateY(-50%);
+           font-size:17px; white-space:nowrap; letter-spacing:-3px; }
+  .army.bulls { animation:pushR .55s ease-in-out infinite alternate; }
+  .army.bears { animation:pushL .62s ease-in-out infinite alternate; }
+  .clash { position:absolute; top:50%; transform:translate(-50%,-50%);
+            font-size:15px; z-index:2;
+            animation:clashHit .5s ease-in-out infinite alternate; }
+  .lchg { flex:0 0 96px; text-align:right; font-weight:700; }
+  .px { font-family:'Press Start 2P',monospace; font-size:12px; }
+  .lane.tS .lname { font-size:15px; }
+  .lane.tS .army { font-size:21px; }
+  .lane.tS .field { height:40px; box-shadow:0 0 14px rgba(251,191,36,.18) inset; }
+  .lane.tD .field { box-shadow:0 0 12px rgba(124,58,237,.22) inset; }
+  @keyframes pushR { from { margin-right:0; } to { margin-right:-5px; } }
+  @keyframes pushL { from { margin-left:0; } to { margin-left:-5px; } }
+  @keyframes clashHit { from { transform:translate(-50%,-50%) scale(.85) rotate(-8deg); }
+                         to { transform:translate(-50%,-50%) scale(1.35) rotate(10deg); } }
+  .legend { color:var(--dim); font-size:12px; text-align:center; margin-top:26px; }
+  .legend b.u { color:#ef4444; } .legend b.d { color:#0d9488; }
+  details { margin-top:14px; color:var(--dim); font-size:12.5px; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; }
+  th,td { border-bottom:1px solid #1e293b; padding:5px 8px; text-align:left;
+           font-variant-numeric:tabular-nums; }
+  a.back { color:#60a5fa; }
+  /* ══ 資金流向 ══ */
+  .panel-h { font-family:'Press Start 2P',monospace; font-size:13px; color:#fbbf24;
+              margin:30px 0 10px; }
+  .panel-sub { font-family:'Noto Sans TC'; font-size:11.5px; color:var(--dim);
+                letter-spacing:0; }
+  .mpanel { background:var(--panel); border:1px solid #1e293b; border-radius:14px;
+             padding:8px 14px; }
+  .mrow { display:flex; align-items:center; gap:10px; padding:6px 0;
+           border-bottom:1px dashed #1e293b; }
+  .mrow:last-child { border-bottom:none; }
+  .msec { flex:0 0 128px; font-size:13px; font-weight:700; }
+  .mtrack { flex:1; background:#1e293b; border-radius:3px; height:9px;
+             overflow:hidden; display:block; }
+  .mfill { display:block; height:100%; border-radius:0 3px 3px 0;
+            background:linear-gradient(90deg,#b45309,#fbbf24);
+            animation:grow .9s cubic-bezier(.2,.8,.2,1) both; }
+  .mpct { flex:0 0 52px; text-align:right; font-weight:700; font-size:12.5px;
+           color:#fbbf24; font-variant-numeric:tabular-nums; }
+  .mchg { flex:0 0 56px; text-align:right; font-size:12px;
+           font-variant-numeric:tabular-nums; }
+  /* ══ 輪動熱力圖 ══ */
+  .heat-wrap { background:var(--panel); border:1px solid #1e293b;
+                border-radius:14px; padding:10px; overflow-x:auto; }
+  .heat { border-collapse:collapse; }
+  .heat th { font-size:9px; color:var(--dim); font-weight:400; padding:2px 1px;
+              writing-mode:vertical-rl; white-space:nowrap; }
+  .heat td.hc { width:22px; height:20px; min-width:22px; text-align:center;
+                 font-size:10px; border:1px solid #0b1120; border-radius:3px; }
+  .heat td.hsec, .heat th.hsec { writing-mode:horizontal-tb; font-size:11.5px;
+       color:var(--ink); text-align:right; padding-right:8px; white-space:nowrap;
+       font-weight:700; }
+  @media (max-width:560px) {
+    .lname { flex-basis:100px; font-size:12px; }
+    .lchg { flex-basis:74px; } .px { font-size:10px; }
+    .army { font-size:14px; } .lane.tS .army { font-size:17px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation:none !important; } }
+</style></head><body><div class="wrap">
+  <h1>🏟️ 板塊競技場</h1>
+  <div class="sub">2026-09-18 收盤結算 ·
+    33 個板塊 · 1088 檔個股 ·
+    強勢 26 vs 弱勢 7</div>
+  <div class="battle-tag">⚔ TODAY'S BATTLE ⚔</div>
+  <div class="versus">
+    <span class="who" style="color:#ef4444">🏆 半導體業
+      <span class="num">+3.36%</span></span>
+    <span class="vs">VS</span>
+    <span class="who" style="color:#0d9488">💀 存託憑證
+      <span class="num">-1.38%</span></span>
+  </div>
+  <div class="tier-head" style="color:#fbbf24"><span class="tier-letter">S</span> 🏆 制霸 <span class="tier-n">2 板塊</span></div><div class="battlefield">
+    <div class="lane tS" title="半導體業 · 96 檔 · 上漲比 95% · 成交 4364 億 · 👑王牌 京元電子 +10.0%">
+      <div class="lname">半導體業 <span class="mini hot">🔥3連勝</span> <span class="mini zap">⚡×7</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:18%">👑🐂🐂🐂🐂🐂</span>
+        <span class="clash" style="left:82%">💥</span>
+        <span class="army bears" style="left:82%">😵🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+3.36%</div>
+    </div>
+    <div class="lane tS" title="資訊服務業 · 11 檔 · 上漲比 82% · 成交 24 億 · 👑王牌 華經 +10.0%">
+      <div class="lname">資訊服務業 <span class="mini zap">⚡×1</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:22%">👑🐂🐂🐂🐂🐂</span>
+        <span class="clash" style="left:78%">💥</span>
+        <span class="army bears" style="left:78%">😵🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+2.92%</div>
+    </div></div><div class="tier-head" style="color:#e2e8f0"><span class="tier-letter">A</span> 🥇 強勢 <span class="tier-n">4 板塊</span></div><div class="battlefield">
+    <div class="lane tA" title="光電業 · 66 檔 · 上漲比 83% · 成交 677 億 · 👑王牌 光鋐 +9.9%">
+      <div class="lname">光電業 <span class="mini hot">🔥3連勝</span> <span class="mini zap">⚡×4</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:23%">🐂🐂🐂🐂🐂</span>
+        <span class="clash" style="left:77%">💥</span>
+        <span class="army bears" style="left:77%">😵🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+2.79%</div>
+    </div>
+    <div class="lane tA" title="其他電子業 · 46 檔 · 上漲比 85% · 成交 510 億 · 👑王牌 汎銓 +10.0%">
+      <div class="lname">其他電子業 <span class="mini hot">🔥3連勝</span> <span class="mini zap">⚡×4</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:28%">🐂🐂🐂🐂🐂</span>
+        <span class="clash" style="left:72%">💥</span>
+        <span class="army bears" style="left:72%">😵🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+2.28%</div>
+    </div>
+    <div class="lane tA" title="電子零組件業 · 104 檔 · 上漲比 81% · 成交 1810 億 · 👑王牌 宏致 +10.0%">
+      <div class="lname">電子零組件業 <span class="mini zap">⚡×6</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:29%">🐂🐂🐂🐂</span>
+        <span class="clash" style="left:71%">💥</span>
+        <span class="army bears" style="left:71%">😵🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+2.17%</div>
+    </div>
+    <div class="lane tA" title="數位雲端 · 13 檔 · 上漲比 62% · 成交 5 億 · 👑王牌 GOGOLOOK +9.7%">
+      <div class="lname">數位雲端 <span class="mini hot">🔥3連勝</span> <span class="mini zap">⚡×1</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:34%">🐂🐂🐂</span>
+        <span class="clash" style="left:66%">💥</span>
+        <span class="army bears" style="left:66%">😵🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+1.72%</div>
+    </div></div><div class="tier-head" style="color:#94a3b8"><span class="tier-letter">B</span> 🛡️ 均衡 <span class="tier-n">20 板塊</span></div><div class="battlefield">
+    <div class="lane tB" title="建材營造 · 55 檔 · 上漲比 74% · 成交 38 億 · 👑王牌 欣巴巴 +10.0%">
+      <div class="lname">建材營造 <span class="mini hot">🔥3連勝</span> <span class="mini zap">⚡×2</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:34%">🐂🐂🐂🐂</span>
+        <span class="clash" style="left:66%">💥</span>
+        <span class="army bears" style="left:66%">😵🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+1.65%</div>
+    </div>
+    <div class="lane tB" title="電子通路業 · 22 檔 · 上漲比 91% · 成交 62 億 · 👑王牌 蔚華科 +6.2%">
+      <div class="lname">電子通路業 <span class="mini hot">🔥3連勝</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:35%">🐂🐂🐂🐂🐂</span>
+        <span class="clash" style="left:65%">💥</span>
+        <span class="army bears" style="left:65%">😵🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+1.58%</div>
+    </div>
+    <div class="lane tB" title="鋼鐵工業 · 31 檔 · 上漲比 77% · 成交 23 億 · 👑王牌 佳大 +9.9%">
+      <div class="lname">鋼鐵工業 <span class="mini hot">🔥3連勝</span> <span class="mini zap">⚡×1</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:38%">🐂🐂🐂🐂</span>
+        <span class="clash" style="left:62%">💥</span>
+        <span class="army bears" style="left:62%">🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+1.30%</div>
+    </div>
+    <div class="lane tB" title="玻璃陶瓷 · 5 檔 · 上漲比 100% · 成交 21 億 · 👑王牌 中釉 +3.5%">
+      <div class="lname">玻璃陶瓷 <span class="mini hot">🔥3連勝</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:38%">🐂🐂🐂🐂🐂🐂</span>
+        <span class="clash" style="left:62%">💥</span>
+        <span class="army bears" style="left:62%">🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+1.29%</div>
+    </div>
+    <div class="lane tB" title="綠能環保 · 27 檔 · 上漲比 63% · 成交 57 億 · 👑王牌 聯友金屬-創 +9.9%">
+      <div class="lname">綠能環保 <span class="mini hot">🔥3連勝</span> <span class="mini zap">⚡×1</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:39%">🐂🐂🐂🐂</span>
+        <span class="clash" style="left:61%">💥</span>
+        <span class="army bears" style="left:61%">🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+1.13%</div>
+    </div>
+    <div class="lane tB" title="電腦及週邊設備業 · 64 檔 · 上漲比 73% · 成交 655 億 · 👑王牌 歐格 +9.9%">
+      <div class="lname">電腦及週邊設備業 <span class="mini hot">🔥3連勝</span> <span class="mini zap">⚡×1</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:39%">🐂🐂🐂🐂</span>
+        <span class="clash" style="left:61%">💥</span>
+        <span class="army bears" style="left:61%">🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+1.13%</div>
+    </div>
+    <div class="lane tB" title="通信網路業 · 45 檔 · 上漲比 64% · 成交 379 億 · 👑王牌 譁裕 +6.5%">
+      <div class="lname">通信網路業 <span class="mini hot">🔥3連勝</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:41%">🐂🐂🐂🐂</span>
+        <span class="clash" style="left:59%">💥</span>
+        <span class="army bears" style="left:59%">🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+0.95%</div>
+    </div>
+    <div class="lane tB" title="電機機械 · 49 檔 · 上漲比 67% · 成交 213 億 · 👑王牌 高力 +10.0%">
+      <div class="lname">電機機械 <span class="mini hot">🔥3連勝</span> <span class="mini zap">⚡×2</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:41%">🐂🐂🐂🐂</span>
+        <span class="clash" style="left:59%">💥</span>
+        <span class="army bears" style="left:59%">🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+0.94%</div>
+    </div>
+    <div class="lane tB" title="生技醫療業 · 60 檔 · 上漲比 60% · 成交 188 億 · 👑王牌 睿生光電 +9.8%">
+      <div class="lname">生技醫療業 <span class="mini hot">🔥3連勝</span> <span class="mini zap">⚡×1</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:42%">🐂🐂🐂</span>
+        <span class="clash" style="left:58%">💥</span>
+        <span class="army bears" style="left:58%">🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+0.88%</div>
+    </div>
+    <div class="lane tB" title="汽車工業 · 44 檔 · 上漲比 61% · 成交 21 億 · 👑王牌 麗清 +9.9%">
+      <div class="lname">汽車工業 <span class="mini hot">🔥3連勝</span> <span class="mini zap">⚡×2</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:43%">🐂🐂🐂</span>
+        <span class="clash" style="left:57%">💥</span>
+        <span class="army bears" style="left:57%">🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+0.69%</div>
+    </div>
+    <div class="lane tB" title="貿易百貨 · 18 檔 · 上漲比 56% · 成交 8 億 · 👑王牌 台南-KY +8.3%">
+      <div class="lname">貿易百貨 <span class="mini hot">🔥2連勝</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:44%">🐂🐂🐂</span>
+        <span class="clash" style="left:56%">💥</span>
+        <span class="army bears" style="left:56%">🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+0.67%</div>
+    </div>
+    <div class="lane tB" title="其他 · 52 檔 · 上漲比 60% · 成交 25 億 · 👑王牌 吉源-KY +3.9%">
+      <div class="lname">其他 <span class="mini hot">🔥3連勝</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:45%">🐂🐂🐂</span>
+        <span class="clash" style="left:55%">💥</span>
+        <span class="army bears" style="left:55%">🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+0.54%</div>
+    </div>
+    <div class="lane tB" title="居家生活 · 11 檔 · 上漲比 82% · 成交 4 億 · 👑王牌 峰源-KY +1.8%">
+      <div class="lname">居家生活 <span class="mini hot">🔥3連勝</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:45%">🐂🐂🐂🐂🐂</span>
+        <span class="clash" style="left:55%">💥</span>
+        <span class="army bears" style="left:55%">🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+0.49%</div>
+    </div>
+    <div class="lane tB" title="電器電纜 · 16 檔 · 上漲比 75% · 成交 15 億 · 👑王牌 禾聯碩 +5.6%">
+      <div class="lname">電器電纜 <span class="mini hot">🔥3連勝</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:45%">🐂🐂🐂🐂</span>
+        <span class="clash" style="left:55%">💥</span>
+        <span class="army bears" style="left:55%">🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+0.48%</div>
+    </div>
+    <div class="lane tB" title="食品工業 · 24 檔 · 上漲比 71% · 成交 20 億 · 👑王牌 興泰 +4.3%">
+      <div class="lname">食品工業 <span class="mini hot">🔥2連勝</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:46%">🐂🐂🐂🐂</span>
+        <span class="clash" style="left:54%">💥</span>
+        <span class="army bears" style="left:54%">🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+0.45%</div>
+    </div>
+    <div class="lane tB" title="水泥工業 · 7 檔 · 上漲比 43% · 成交 9 億 · 👑王牌 嘉泥 +2.3%">
+      <div class="lname">水泥工業 <span class="mini hot">🔥3連勝</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:46%">🐂🐂</span>
+        <span class="clash" style="left:54%">💥</span>
+        <span class="army bears" style="left:54%">🐻🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+0.39%</div>
+    </div>
+    <div class="lane tB" title="觀光餐旅 · 19 檔 · 上漲比 47% · 成交 2 億 · 👑王牌 新天地 +1.7%">
+      <div class="lname">觀光餐旅 <span class="mini hot">🔥2連勝</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:48%">🐂🐂🐂</span>
+        <span class="clash" style="left:52%">💥</span>
+        <span class="army bears" style="left:52%">🐻🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+0.23%</div>
+    </div>
+    <div class="lane tB" title="油電燃氣業 · 8 檔 · 上漲比 50% · 成交 21 億 · 👑王牌 台汽電 +1.7%">
+      <div class="lname">油電燃氣業 <span class="mini hot">🔥2連勝</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:48%">🐂🐂🐂</span>
+        <span class="clash" style="left:52%">💥</span>
+        <span class="army bears" style="left:52%">🐻🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+0.22%</div>
+    </div>
+    <div class="lane tB" title="化學工業 · 28 檔 · 上漲比 54% · 成交 69 億 · 👑王牌 材料*-KY +5.9%">
+      <div class="lname">化學工業 <span class="mini hot">🔥3連勝</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:49%">🐂🐂🐂</span>
+        <span class="clash" style="left:51%">💥</span>
+        <span class="army bears" style="left:51%">🐻🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+0.08%</div>
+    </div>
+    <div class="lane tB" title="紡織纖維 · 41 檔 · 上漲比 39% · 成交 14 億 · 👑王牌 大宇 +2.0%">
+      <div class="lname">紡織纖維 <span class="mini hot">🔥3連勝</span></div>
+      <div class="field bulls-win">
+        <span class="army bulls" style="right:50%">🐂🐂</span>
+        <span class="clash" style="left:50%">💥</span>
+        <span class="army bears" style="left:50%">🐻🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#ef4444">+0.01%</div>
+    </div></div><div class="tier-head" style="color:#64748b"><span class="tier-letter">C</span> 🌧️ 承壓 <span class="tier-n">4 板塊</span></div><div class="battlefield">
+    <div class="lane tC" title="運動休閒 · 18 檔 · 上漲比 56% · 成交 14 億 · 👑王牌 波力-KY +1.6%">
+      <div class="lname">運動休閒</div>
+      <div class="field bears-win">
+        <span class="army bulls" style="right:50%">🐂🐂🐂</span>
+        <span class="clash" style="left:50%">💥</span>
+        <span class="army bears" style="left:50%">🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#0d9488">-0.05%</div>
+    </div>
+    <div class="lane tC" title="航運業 · 28 檔 · 上漲比 43% · 成交 132 億 · 👑王牌 星宇航空 +1.7%">
+      <div class="lname">航運業</div>
+      <div class="field bears-win">
+        <span class="army bulls" style="right:52%">🐂🐂</span>
+        <span class="clash" style="left:48%">💥</span>
+        <span class="army bears" style="left:48%">🐻🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#0d9488">-0.24%</div>
+    </div>
+    <div class="lane tC" title="塑膠工業 · 21 檔 · 上漲比 29% · 成交 244 億 · 👑王牌 達新 +1.9%">
+      <div class="lname">塑膠工業</div>
+      <div class="field bears-win">
+        <span class="army bulls" style="right:56%">🐂🐂</span>
+        <span class="clash" style="left:44%">💥</span>
+        <span class="army bears" style="left:44%">🐻🐻🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#0d9488">-0.62%</div>
+    </div>
+    <div class="lane tC" title="金融保險業 · 31 檔 · 上漲比 23% · 成交 453 億 · 👑王牌 安泰銀 +1.9%">
+      <div class="lname">金融保險業</div>
+      <div class="field bears-win">
+        <span class="army bulls" style="right:57%">🐂</span>
+        <span class="clash" style="left:43%">💥</span>
+        <span class="army bears" style="left:43%">🐻🐻🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#0d9488">-0.70%</div>
+    </div></div><div class="tier-head" style="color:#a78bfa"><span class="tier-letter">D</span> 💀 潰敗 <span class="tier-n">3 板塊</span></div><div class="battlefield">
+    <div class="lane tD" title="橡膠工業 · 11 檔 · 上漲比 36% · 成交 6 億 · 👑王牌 厚生 +1.7%">
+      <div class="lname">橡膠工業</div>
+      <div class="field bears-win">
+        <span class="army bulls" style="right:58%">🐂🐂</span>
+        <span class="clash" style="left:42%">💥</span>
+        <span class="army bears" style="left:42%">🐻🐻🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#0d9488">-0.82%</div>
+    </div>
+    <div class="lane tD" title="造紙工業 · 7 檔 · 上漲比 14% · 成交 1 億 · 👑王牌 寶隆 +0.5%">
+      <div class="lname">造紙工業</div>
+      <div class="field bears-win">
+        <span class="army bulls" style="right:60%">🐂</span>
+        <span class="clash" style="left:40%">💥</span>
+        <span class="army bears" style="left:40%">🐻🐻🐻🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#0d9488">-1.02%</div>
+    </div>
+    <div class="lane tD" title="存託憑證 · 10 檔 · 上漲比 20% · 成交 1 億 · 👑王牌 巨騰-DR +1.5%">
+      <div class="lname">存託憑證 <span class="mini cold">❄️17連敗</span></div>
+      <div class="field bears-win">
+        <span class="army bulls" style="right:63%">🐂</span>
+        <span class="clash" style="left:37%">💥</span>
+        <span class="army bears" style="left:37%">🐻🐻🐻🐻</span>
+      </div>
+      <div class="lchg px" style="color:#0d9488">-1.38%</div>
+    </div></div>
+  
+  <div class="panel-h">💰 資金流向 <span class="panel-sub">今日成交額占比 ·
+    前三大板塊吃掉 68% 的錢</span></div>
+  <div class="mpanel">
+    <div class="mrow" title="半導體業 · 成交 4364 億 (占全市場 43.3%) · 平均 +3.36%">
+      <span class="msec">半導體業</span>
+      <span class="mtrack"><span class="mfill" style="width:100%"></span></span>
+      <span class="mpct">43.3%</span>
+      <span class="mchg" style="color:#ef4444">+3.4%</span>
+    </div>
+    <div class="mrow" title="電子零組件業 · 成交 1810 億 (占全市場 17.9%) · 平均 +2.17%">
+      <span class="msec">電子零組件業</span>
+      <span class="mtrack"><span class="mfill" style="width:41%"></span></span>
+      <span class="mpct">17.9%</span>
+      <span class="mchg" style="color:#ef4444">+2.2%</span>
+    </div>
+    <div class="mrow" title="光電業 · 成交 677 億 (占全市場 6.7%) · 平均 +2.79%">
+      <span class="msec">光電業</span>
+      <span class="mtrack"><span class="mfill" style="width:16%"></span></span>
+      <span class="mpct">6.7%</span>
+      <span class="mchg" style="color:#ef4444">+2.8%</span>
+    </div>
+    <div class="mrow" title="電腦及週邊設備業 · 成交 655 億 (占全市場 6.5%) · 平均 +1.13%">
+      <span class="msec">電腦及週邊設備業</span>
+      <span class="mtrack"><span class="mfill" style="width:15%"></span></span>
+      <span class="mpct">6.5%</span>
+      <span class="mchg" style="color:#ef4444">+1.1%</span>
+    </div>
+    <div class="mrow" title="其他電子業 · 成交 510 億 (占全市場 5.1%) · 平均 +2.28%">
+      <span class="msec">其他電子業</span>
+      <span class="mtrack"><span class="mfill" style="width:12%"></span></span>
+      <span class="mpct">5.1%</span>
+      <span class="mchg" style="color:#ef4444">+2.3%</span>
+    </div>
+    <div class="mrow" title="金融保險業 · 成交 453 億 (占全市場 4.5%) · 平均 -0.70%">
+      <span class="msec">金融保險業</span>
+      <span class="mtrack"><span class="mfill" style="width:10%"></span></span>
+      <span class="mpct">4.5%</span>
+      <span class="mchg" style="color:#0d9488">-0.7%</span>
+    </div>
+    <div class="mrow" title="通信網路業 · 成交 379 億 (占全市場 3.8%) · 平均 +0.95%">
+      <span class="msec">通信網路業</span>
+      <span class="mtrack"><span class="mfill" style="width:9%"></span></span>
+      <span class="mpct">3.8%</span>
+      <span class="mchg" style="color:#ef4444">+0.9%</span>
+    </div>
+    <div class="mrow" title="塑膠工業 · 成交 244 億 (占全市場 2.4%) · 平均 -0.62%">
+      <span class="msec">塑膠工業</span>
+      <span class="mtrack"><span class="mfill" style="width:6%"></span></span>
+      <span class="mpct">2.4%</span>
+      <span class="mchg" style="color:#0d9488">-0.6%</span>
+    </div>
+    <div class="mrow" title="電機機械 · 成交 213 億 (占全市場 2.1%) · 平均 +0.94%">
+      <span class="msec">電機機械</span>
+      <span class="mtrack"><span class="mfill" style="width:5%"></span></span>
+      <span class="mpct">2.1%</span>
+      <span class="mchg" style="color:#ef4444">+0.9%</span>
+    </div>
+    <div class="mrow" title="生技醫療業 · 成交 188 億 (占全市場 1.9%) · 平均 +0.88%">
+      <span class="msec">生技醫療業</span>
+      <span class="mtrack"><span class="mfill" style="width:4%"></span></span>
+      <span class="mpct">1.9%</span>
+      <span class="mchg" style="color:#ef4444">+0.9%</span>
+    </div>
+    <div class="mrow" title="航運業 · 成交 132 億 (占全市場 1.3%) · 平均 -0.24%">
+      <span class="msec">航運業</span>
+      <span class="mtrack"><span class="mfill" style="width:3%"></span></span>
+      <span class="mpct">1.3%</span>
+      <span class="mchg" style="color:#0d9488">-0.2%</span>
+    </div>
+    <div class="mrow" title="化學工業 · 成交 69 億 (占全市場 0.7%) · 平均 +0.08%">
+      <span class="msec">化學工業</span>
+      <span class="mtrack"><span class="mfill" style="width:2%"></span></span>
+      <span class="mpct">0.7%</span>
+      <span class="mchg" style="color:#ef4444">+0.1%</span>
+    </div></div>
+  
+  <div class="panel-h">🔁 板塊輪動 <span class="panel-sub">近 17 個交易日
+    · 紅=漲 青=跌 (越深越猛) · 💰=當日資金王 · 每日收盤自動累積</span></div>
+  <div class="heat-wrap"><table class="heat">
+    <tr><th class="hsec"></th><th title="2026-08-26">08/26</th><th title="2026-08-27">08/27</th><th title="2026-08-28">08/28</th><th title="2026-08-31">08/31</th><th title="2026-09-01">09/01</th><th title="2026-09-02">09/02</th><th title="2026-09-03">09/03</th><th title="2026-09-04">09/04</th><th title="2026-09-07">09/07</th><th title="2026-09-08">09/08</th><th title="2026-09-09">09/09</th><th title="2026-09-10">09/10</th><th title="2026-09-11">09/11</th><th title="2026-09-15">09/15</th><th title="2026-09-16">09/16</th><th title="2026-09-17">09/17</th><th title="2026-09-18">09/18</th></tr><tr><td class="hsec">半導體業</td><td class="hc" style="background:rgba(239,68,68,0.90)" title="2026-08-26 半導體業 +2.71%">💰</td><td class="hc" style="background:rgba(239,68,68,0.04)" title="2026-08-27 半導體業 +0.12%">💰</td><td class="hc" style="background:rgba(239,68,68,0.24)" title="2026-08-28 半導體業 +0.72%">💰</td><td class="hc" style="background:rgba(13,148,136,0.48)" title="2026-08-31 半導體業 -1.43%">💰</td><td class="hc" style="background:rgba(239,68,68,0.64)" title="2026-09-01 半導體業 +1.92%">💰</td><td class="hc" style="background:rgba(13,148,136,0.16)" title="2026-09-02 半導體業 -0.49%">💰</td><td class="hc" style="background:rgba(13,148,136,0.81)" title="2026-09-03 半導體業 -2.42%">💰</td><td class="hc" style="background:rgba(239,68,68,0.56)" title="2026-09-04 半導體業 +1.69%">💰</td><td class="hc" style="background:rgba(239,68,68,0.21)" title="2026-09-07 半導體業 +0.64%">💰</td><td class="hc" style="background:rgba(13,148,136,0.55)" title="2026-09-08 半導體業 -1.64%">💰</td><td class="hc" style="background:rgba(239,68,68,0.15)" title="2026-09-09 半導體業 +0.44%">💰</td><td class="hc" style="background:rgba(13,148,136,0.10)" title="2026-09-10 半導體業 -0.31%">💰</td><td class="hc" style="background:rgba(13,148,136,0.67)" title="2026-09-11 半導體業 -2.02%">💰</td><td class="hc" style="background:rgba(13,148,136,0.61)" title="2026-09-15 半導體業 -1.84%">💰</td><td class="hc" style="background:rgba(239,68,68,0.94)" title="2026-09-16 半導體業 +2.81%">💰</td><td class="hc" style="background:rgba(239,68,68,0.19)" title="2026-09-17 半導體業 +0.58%">💰</td><td class="hc" style="background:rgba(239,68,68,1.00)" title="2026-09-18 半導體業 +3.36%">💰</td></tr><tr><td class="hsec">電子零組件業</td><td class="hc" style="background:rgba(239,68,68,0.69)" title="2026-08-26 電子零組件業 +2.06%"></td><td class="hc" style="background:rgba(239,68,68,0.75)" title="2026-08-27 電子零組件業 +2.24%"></td><td class="hc" style="background:rgba(239,68,68,0.45)" title="2026-08-28 電子零組件業 +1.36%"></td><td class="hc" style="background:rgba(13,148,136,0.40)" title="2026-08-31 電子零組件業 -1.19%"></td><td class="hc" style="background:rgba(239,68,68,0.24)" title="2026-09-01 電子零組件業 +0.71%"></td><td class="hc" style="background:rgba(13,148,136,0.38)" title="2026-09-02 電子零組件業 -1.15%"></td><td class="hc" style="background:rgba(13,148,136,0.98)" title="2026-09-03 電子零組件業 -2.95%"></td><td class="hc" style="background:rgba(239,68,68,0.79)" title="2026-09-04 電子零組件業 +2.37%"></td><td class="hc" style="background:rgba(239,68,68,0.18)" title="2026-09-07 電子零組件業 +0.55%"></td><td class="hc" style="background:rgba(13,148,136,0.55)" title="2026-09-08 電子零組件業 -1.66%"></td><td class="hc" style="background:rgba(239,68,68,0.42)" title="2026-09-09 電子零組件業 +1.26%"></td><td class="hc" style="background:rgba(13,148,136,0.34)" title="2026-09-10 電子零組件業 -1.01%"></td><td class="hc" style="background:rgba(13,148,136,0.43)" title="2026-09-11 電子零組件業 -1.28%"></td><td class="hc" style="background:rgba(13,148,136,0.45)" title="2026-09-15 電子零組件業 -1.35%"></td><td class="hc" style="background:rgba(239,68,68,0.75)" title="2026-09-16 電子零組件業 +2.24%"></td><td class="hc" style="background:rgba(13,148,136,0.06)" title="2026-09-17 電子零組件業 -0.17%"></td><td class="hc" style="background:rgba(239,68,68,0.72)" title="2026-09-18 電子零組件業 +2.17%"></td></tr><tr><td class="hsec">光電業</td><td class="hc" style="background:rgba(239,68,68,1.00)" title="2026-08-26 光電業 +3.08%"></td><td class="hc" style="background:rgba(239,68,68,0.50)" title="2026-08-27 光電業 +1.51%"></td><td class="hc" style="background:rgba(239,68,68,0.15)" title="2026-08-28 光電業 +0.45%"></td><td class="hc" style="background:rgba(13,148,136,0.17)" title="2026-08-31 光電業 -0.51%"></td><td class="hc" style="background:rgba(239,68,68,0.03)" title="2026-09-01 光電業 +0.08%"></td><td class="hc" style="background:rgba(239,68,68,0.32)" title="2026-09-02 光電業 +0.96%"></td><td class="hc" style="background:rgba(13,148,136,1.00)" title="2026-09-03 光電業 -3.18%"></td><td class="hc" style="background:rgba(239,68,68,0.51)" title="2026-09-04 光電業 +1.52%"></td><td class="hc" style="background:rgba(13,148,136,0.28)" title="2026-09-07 光電業 -0.83%"></td><td class="hc" style="background:rgba(13,148,136,0.45)" title="2026-09-08 光電業 -1.34%"></td><td class="hc" style="background:rgba(239,68,68,0.45)" title="2026-09-09 光電業 +1.34%"></td><td class="hc" style="background:rgba(13,148,136,0.32)" title="2026-09-10 光電業 -0.96%"></td><td class="hc" style="background:rgba(13,148,136,0.45)" title="2026-09-11 光電業 -1.36%"></td><td class="hc" style="background:rgba(13,148,136,0.46)" title="2026-09-15 光電業 -1.37%"></td><td class="hc" style="background:rgba(239,68,68,0.98)" title="2026-09-16 光電業 +2.94%"></td><td class="hc" style="background:rgba(239,68,68,0.60)" title="2026-09-17 光電業 +1.80%"></td><td class="hc" style="background:rgba(239,68,68,0.93)" title="2026-09-18 光電業 +2.79%"></td></tr><tr><td class="hsec">電腦及週邊設備業</td><td class="hc" style="background:rgba(239,68,68,0.48)" title="2026-08-26 電腦及週邊設備業 +1.45%"></td><td class="hc" style="background:rgba(239,68,68,0.05)" title="2026-08-27 電腦及週邊設備業 +0.14%"></td><td class="hc" style="background:rgba(239,68,68,0.05)" title="2026-08-28 電腦及週邊設備業 +0.15%"></td><td class="hc" style="background:rgba(239,68,68,0.03)" title="2026-08-31 電腦及週邊設備業 +0.08%"></td><td class="hc" style="background:rgba(239,68,68,0.34)" title="2026-09-01 電腦及週邊設備業 +1.03%"></td><td class="hc" style="background:rgba(239,68,68,0.17)" title="2026-09-02 電腦及週邊設備業 +0.51%"></td><td class="hc" style="background:rgba(13,148,136,0.89)" title="2026-09-03 電腦及週邊設備業 -2.67%"></td><td class="hc" style="background:rgba(239,68,68,1.00)" title="2026-09-04 電腦及週邊設備業 +3.00%"></td><td class="hc" style="background:rgba(13,148,136,0.37)" title="2026-09-07 電腦及週邊設備業 -1.11%"></td><td class="hc" style="background:rgba(13,148,136,0.79)" title="2026-09-08 電腦及週邊設備業 -2.37%"></td><td class="hc" style="background:rgba(239,68,68,0.33)" title="2026-09-09 電腦及週邊設備業 +0.98%"></td><td class="hc" style="background:rgba(13,148,136,0.22)" title="2026-09-10 電腦及週邊設備業 -0.67%"></td><td class="hc" style="background:rgba(13,148,136,0.39)" title="2026-09-11 電腦及週邊設備業 -1.17%"></td><td class="hc" style="background:rgba(13,148,136,0.41)" title="2026-09-15 電腦及週邊設備業 -1.22%"></td><td class="hc" style="background:rgba(239,68,68,0.52)" title="2026-09-16 電腦及週邊設備業 +1.57%"></td><td class="hc" style="background:rgba(239,68,68,0.52)" title="2026-09-17 電腦及週邊設備業 +1.57%"></td><td class="hc" style="background:rgba(239,68,68,0.38)" title="2026-09-18 電腦及週邊設備業 +1.13%"></td></tr><tr><td class="hsec">其他電子業</td><td class="hc" style="background:rgba(239,68,68,0.53)" title="2026-08-26 其他電子業 +1.59%"></td><td class="hc" style="background:rgba(239,68,68,0.27)" title="2026-08-27 其他電子業 +0.81%"></td><td class="hc" style="background:rgba(13,148,136,0.09)" title="2026-08-28 其他電子業 -0.27%"></td><td class="hc" style="background:rgba(13,148,136,0.23)" title="2026-08-31 其他電子業 -0.70%"></td><td class="hc" style="background:rgba(239,68,68,0.64)" title="2026-09-01 其他電子業 +1.93%"></td><td class="hc" style="background:rgba(13,148,136,0.20)" title="2026-09-02 其他電子業 -0.60%"></td><td class="hc" style="background:rgba(13,148,136,0.42)" title="2026-09-03 其他電子業 -1.26%"></td><td class="hc" style="background:rgba(239,68,68,0.28)" title="2026-09-04 其他電子業 +0.84%"></td><td class="hc" style="background:rgba(13,148,136,0.04)" title="2026-09-07 其他電子業 -0.13%"></td><td class="hc" style="background:rgba(13,148,136,0.50)" title="2026-09-08 其他電子業 -1.50%"></td><td class="hc" style="background:rgba(239,68,68,0.14)" title="2026-09-09 其他電子業 +0.42%"></td><td class="hc" style="background:rgba(13,148,136,0.29)" title="2026-09-10 其他電子業 -0.87%"></td><td class="hc" style="background:rgba(13,148,136,0.49)" title="2026-09-11 其他電子業 -1.47%"></td><td class="hc" style="background:rgba(13,148,136,0.21)" title="2026-09-15 其他電子業 -0.64%"></td><td class="hc" style="background:rgba(239,68,68,0.36)" title="2026-09-16 其他電子業 +1.09%"></td><td class="hc" style="background:rgba(239,68,68,0.08)" title="2026-09-17 其他電子業 +0.23%"></td><td class="hc" style="background:rgba(239,68,68,0.76)" title="2026-09-18 其他電子業 +2.28%"></td></tr><tr><td class="hsec">金融保險業</td><td class="hc" style="background:rgba(239,68,68,0.21)" title="2026-08-26 金融保險業 +0.63%"></td><td class="hc" style="background:rgba(13,148,136,0.03)" title="2026-08-27 金融保險業 -0.09%"></td><td class="hc" style="background:rgba(239,68,68,0.19)" title="2026-08-28 金融保險業 +0.58%"></td><td class="hc" style="background:rgba(239,68,68,0.34)" title="2026-08-31 金融保險業 +1.02%"></td><td class="hc" style="background:rgba(239,68,68,0.39)" title="2026-09-01 金融保險業 +1.17%"></td><td class="hc" style="background:rgba(239,68,68,0.26)" title="2026-09-02 金融保險業 +0.79%"></td><td class="hc" style="background:rgba(239,68,68,0.54)" title="2026-09-03 金融保險業 +1.61%"></td><td class="hc" style="background:rgba(239,68,68,0.21)" title="2026-09-04 金融保險業 +0.64%"></td><td class="hc" style="background:rgba(13,148,136,0.07)" title="2026-09-07 金融保險業 -0.20%"></td><td class="hc" style="background:rgba(239,68,68,0.40)" title="2026-09-08 金融保險業 +1.21%"></td><td class="hc" style="background:rgba(13,148,136,0.29)" title="2026-09-09 金融保險業 -0.86%"></td><td class="hc" style="background:rgba(13,148,136,0.05)" title="2026-09-10 金融保險業 -0.15%"></td><td class="hc" style="background:rgba(239,68,68,0.43)" title="2026-09-11 金融保險業 +1.29%"></td><td class="hc" style="background:rgba(13,148,136,0.33)" title="2026-09-15 金融保險業 -0.98%"></td><td class="hc" style="background:rgba(239,68,68,0.30)" title="2026-09-16 金融保險業 +0.90%"></td><td class="hc" style="background:rgba(239,68,68,0.36)" title="2026-09-17 金融保險業 +1.09%"></td><td class="hc" style="background:rgba(13,148,136,0.23)" title="2026-09-18 金融保險業 -0.70%"></td></tr><tr><td class="hsec">通信網路業</td><td class="hc" style="background:rgba(239,68,68,0.37)" title="2026-08-26 通信網路業 +1.11%"></td><td class="hc" style="background:rgba(13,148,136,0.01)" title="2026-08-27 通信網路業 -0.04%"></td><td class="hc" style="background:rgba(13,148,136,0.10)" title="2026-08-28 通信網路業 -0.29%"></td><td class="hc" style="background:rgba(13,148,136,0.07)" title="2026-08-31 通信網路業 -0.22%"></td><td class="hc" style="background:rgba(239,68,68,0.14)" title="2026-09-01 通信網路業 +0.43%"></td><td class="hc" style="background:rgba(239,68,68,0.15)" title="2026-09-02 通信網路業 +0.46%"></td><td class="hc" style="background:rgba(13,148,136,0.67)" title="2026-09-03 通信網路業 -2.01%"></td><td class="hc" style="background:rgba(239,68,68,0.36)" title="2026-09-04 通信網路業 +1.08%"></td><td class="hc" style="background:rgba(13,148,136,0.24)" title="2026-09-07 通信網路業 -0.73%"></td><td class="hc" style="background:rgba(13,148,136,0.43)" title="2026-09-08 通信網路業 -1.29%"></td><td class="hc" style="background:rgba(239,68,68,0.27)" title="2026-09-09 通信網路業 +0.80%"></td><td class="hc" style="background:rgba(13,148,136,0.14)" title="2026-09-10 通信網路業 -0.42%"></td><td class="hc" style="background:rgba(13,148,136,0.17)" title="2026-09-11 通信網路業 -0.50%"></td><td class="hc" style="background:rgba(13,148,136,0.29)" title="2026-09-15 通信網路業 -0.88%"></td><td class="hc" style="background:rgba(239,68,68,0.51)" title="2026-09-16 通信網路業 +1.54%"></td><td class="hc" style="background:rgba(239,68,68,0.24)" title="2026-09-17 通信網路業 +0.72%"></td><td class="hc" style="background:rgba(239,68,68,0.32)" title="2026-09-18 通信網路業 +0.95%"></td></tr><tr><td class="hsec">塑膠工業</td><td class="hc" style="background:rgba(239,68,68,0.79)" title="2026-08-26 塑膠工業 +2.36%"></td><td class="hc" style="background:rgba(239,68,68,0.67)" title="2026-08-27 塑膠工業 +2.01%"></td><td class="hc" style="background:rgba(13,148,136,0.43)" title="2026-08-28 塑膠工業 -1.30%"></td><td class="hc" style="background:rgba(239,68,68,0.83)" title="2026-08-31 塑膠工業 +2.49%"></td><td class="hc" style="background:rgba(239,68,68,0.17)" title="2026-09-01 塑膠工業 +0.52%"></td><td class="hc" style="background:rgba(13,148,136,0.12)" title="2026-09-02 塑膠工業 -0.35%"></td><td class="hc" style="background:rgba(13,148,136,0.45)" title="2026-09-03 塑膠工業 -1.35%"></td><td class="hc" style="background:rgba(13,148,136,0.04)" title="2026-09-04 塑膠工業 -0.13%"></td><td class="hc" style="background:rgba(13,148,136,0.10)" title="2026-09-07 塑膠工業 -0.29%"></td><td class="hc" style="background:rgba(13,148,136,0.05)" title="2026-09-08 塑膠工業 -0.14%"></td><td class="hc" style="background:rgba(239,68,68,0.56)" title="2026-09-09 塑膠工業 +1.67%"></td><td class="hc" style="background:rgba(13,148,136,0.25)" title="2026-09-10 塑膠工業 -0.76%"></td><td class="hc" style="background:rgba(13,148,136,0.31)" title="2026-09-11 塑膠工業 -0.94%"></td><td class="hc" style="background:rgba(13,148,136,0.47)" title="2026-09-15 塑膠工業 -1.42%"></td><td class="hc" style="background:rgba(239,68,68,0.22)" title="2026-09-16 塑膠工業 +0.66%"></td><td class="hc" style="background:rgba(239,68,68,0.81)" title="2026-09-17 塑膠工業 +2.43%"></td><td class="hc" style="background:rgba(13,148,136,0.21)" title="2026-09-18 塑膠工業 -0.62%"></td></tr><tr><td class="hsec">電機機械</td><td class="hc" style="background:rgba(239,68,68,0.35)" title="2026-08-26 電機機械 +1.06%"></td><td class="hc" style="background:rgba(239,68,68,0.57)" title="2026-08-27 電機機械 +1.70%"></td><td class="hc" style="background:rgba(13,148,136,0.32)" title="2026-08-28 電機機械 -0.95%"></td><td class="hc" style="background:rgba(13,148,136,0.51)" title="2026-08-31 電機機械 -1.53%"></td><td class="hc" style="background:rgba(239,68,68,0.21)" title="2026-09-01 電機機械 +0.64%"></td><td class="hc" style="background:rgba(13,148,136,0.11)" title="2026-09-02 電機機械 -0.32%"></td><td class="hc" style="background:rgba(13,148,136,0.65)" title="2026-09-03 電機機械 -1.94%"></td><td class="hc" style="background:rgba(239,68,68,0.50)" title="2026-09-04 電機機械 +1.50%"></td><td class="hc" style="background:rgba(13,148,136,0.07)" title="2026-09-07 電機機械 -0.22%"></td><td class="hc" style="background:rgba(13,148,136,0.39)" title="2026-09-08 電機機械 -1.18%"></td><td class="hc" style="background:rgba(239,68,68,0.20)" title="2026-09-09 電機機械 +0.61%"></td><td class="hc" style="background:rgba(13,148,136,0.34)" title="2026-09-10 電機機械 -1.03%"></td><td class="hc" style="background:rgba(13,148,136,0.15)" title="2026-09-11 電機機械 -0.46%"></td><td class="hc" style="background:rgba(13,148,136,0.24)" title="2026-09-15 電機機械 -0.71%"></td><td class="hc" style="background:rgba(239,68,68,0.22)" title="2026-09-16 電機機械 +0.65%"></td><td class="hc" style="background:rgba(239,68,68,0.24)" title="2026-09-17 電機機械 +0.72%"></td><td class="hc" style="background:rgba(239,68,68,0.31)" title="2026-09-18 電機機械 +0.94%"></td></tr><tr><td class="hsec">生技醫療業</td><td class="hc" style="background:rgba(239,68,68,0.52)" title="2026-08-26 生技醫療業 +1.56%"></td><td class="hc" style="background:rgba(13,148,136,0.01)" title="2026-08-27 生技醫療業 -0.02%"></td><td class="hc" style="background:rgba(13,148,136,0.17)" title="2026-08-28 生技醫療業 -0.52%"></td><td class="hc" style="background:rgba(13,148,136,0.25)" title="2026-08-31 生技醫療業 -0.75%"></td><td class="hc" style="background:rgba(13,148,136,0.13)" title="2026-09-01 生技醫療業 -0.38%"></td><td class="hc" style="background:rgba(13,148,136,0.13)" title="2026-09-02 生技醫療業 -0.39%"></td><td class="hc" style="background:rgba(13,148,136,0.38)" title="2026-09-03 生技醫療業 -1.14%"></td><td class="hc" style="background:rgba(239,68,68,0.13)" title="2026-09-04 生技醫療業 +0.39%"></td><td class="hc" style="background:rgba(13,148,136,0.02)" title="2026-09-07 生技醫療業 -0.05%"></td><td class="hc" style="background:rgba(13,148,136,0.16)" title="2026-09-08 生技醫療業 -0.47%"></td><td class="hc" style="background:rgba(239,68,68,0.02)" title="2026-09-09 生技醫療業 +0.06%"></td><td class="hc" style="background:rgba(239,68,68,0.02)" title="2026-09-10 生技醫療業 +0.05%"></td><td class="hc" style="background:rgba(13,148,136,0.41)" title="2026-09-11 生技醫療業 -1.24%"></td><td class="hc" style="background:rgba(13,148,136,0.11)" title="2026-09-15 生技醫療業 -0.34%"></td><td class="hc" style="background:rgba(239,68,68,0.11)" title="2026-09-16 生技醫療業 +0.34%"></td><td class="hc" style="background:rgba(239,68,68,0.45)" title="2026-09-17 生技醫療業 +1.36%"></td><td class="hc" style="background:rgba(239,68,68,0.29)" title="2026-09-18 生技醫療業 +0.88%"></td></tr><tr><td class="hsec">航運業</td><td class="hc" style="background:rgba(13,148,136,0.62)" title="2026-08-26 航運業 -1.85%"></td><td class="hc" style="background:rgba(239,68,68,0.05)" title="2026-08-27 航運業 +0.16%"></td><td class="hc" style="background:rgba(13,148,136,0.52)" title="2026-08-28 航運業 -1.57%"></td><td class="hc" style="background:rgba(239,68,68,0.26)" title="2026-08-31 航運業 +0.79%"></td><td class="hc" style="background:rgba(239,68,68,0.03)" title="2026-09-01 航運業 +0.08%"></td><td class="hc" style="background:rgba(13,148,136,0.03)" title="2026-09-02 航運業 -0.10%"></td><td class="hc" style="background:rgba(239,68,68,0.25)" title="2026-09-03 航運業 +0.76%"></td><td class="hc" style="background:transparent" title="2026-09-04 航運業 +0.00%"></td><td class="hc" style="background:rgba(13,148,136,0.03)" title="2026-09-07 航運業 -0.08%"></td><td class="hc" style="background:rgba(13,148,136,0.20)" title="2026-09-08 航運業 -0.61%"></td><td class="hc" style="background:rgba(239,68,68,0.26)" title="2026-09-09 航運業 +0.79%"></td><td class="hc" style="background:rgba(13,148,136,0.44)" title="2026-09-10 航運業 -1.31%"></td><td class="hc" style="background:rgba(239,68,68,0.10)" title="2026-09-11 航運業 +0.30%"></td><td class="hc" style="background:rgba(13,148,136,0.50)" title="2026-09-15 航運業 -1.51%"></td><td class="hc" style="background:rgba(239,68,68,0.44)" title="2026-09-16 航運業 +1.32%"></td><td class="hc" style="background:rgba(239,68,68,0.38)" title="2026-09-17 航運業 +1.13%"></td><td class="hc" style="background:rgba(13,148,136,0.08)" title="2026-09-18 航運業 -0.24%"></td></tr><tr><td class="hsec">化學工業</td><td class="hc" style="background:rgba(239,68,68,0.70)" title="2026-08-26 化學工業 +2.09%"></td><td class="hc" style="background:rgba(239,68,68,0.08)" title="2026-08-27 化學工業 +0.25%"></td><td class="hc" style="background:rgba(239,68,68,0.31)" title="2026-08-28 化學工業 +0.92%"></td><td class="hc" style="background:rgba(13,148,136,0.07)" title="2026-08-31 化學工業 -0.21%"></td><td class="hc" style="background:rgba(239,68,68,0.60)" title="2026-09-01 化學工業 +1.79%"></td><td class="hc" style="background:rgba(13,148,136,0.42)" title="2026-09-02 化學工業 -1.25%"></td><td class="hc" style="background:rgba(13,148,136,0.77)" title="2026-09-03 化學工業 -2.32%"></td><td class="hc" style="background:rgba(239,68,68,0.41)" title="2026-09-04 化學工業 +1.24%"></td><td class="hc" style="background:rgba(13,148,136,0.14)" title="2026-09-07 化學工業 -0.42%"></td><td class="hc" style="background:rgba(13,148,136,0.10)" title="2026-09-08 化學工業 -0.31%"></td><td class="hc" style="background:rgba(239,68,68,0.18)" title="2026-09-09 化學工業 +0.54%"></td><td class="hc" style="background:rgba(13,148,136,0.35)" title="2026-09-10 化學工業 -1.06%"></td><td class="hc" style="background:rgba(13,148,136,0.36)" title="2026-09-11 化學工業 -1.08%"></td><td class="hc" style="background:rgba(13,148,136,0.31)" title="2026-09-15 化學工業 -0.92%"></td><td class="hc" style="background:rgba(239,68,68,0.60)" title="2026-09-16 化學工業 +1.79%"></td><td class="hc" style="background:rgba(239,68,68,0.78)" title="2026-09-17 化學工業 +2.35%"></td><td class="hc" style="background:rgba(239,68,68,0.03)" title="2026-09-18 化學工業 +0.08%"></td></tr><tr><td class="hsec">電子通路業</td><td class="hc" style="background:rgba(239,68,68,0.22)" title="2026-08-26 電子通路業 +0.66%"></td><td class="hc" style="background:rgba(13,148,136,0.22)" title="2026-08-27 電子通路業 -0.66%"></td><td class="hc" style="background:rgba(13,148,136,0.07)" title="2026-08-28 電子通路業 -0.20%"></td><td class="hc" style="background:rgba(13,148,136,0.28)" title="2026-08-31 電子通路業 -0.85%"></td><td class="hc" style="background:rgba(239,68,68,0.29)" title="2026-09-01 電子通路業 +0.88%"></td><td class="hc" style="background:rgba(239,68,68,0.30)" title="2026-09-02 電子通路業 +0.89%"></td><td class="hc" style="background:rgba(13,148,136,0.58)" title="2026-09-03 電子通路業 -1.74%"></td><td class="hc" style="background:rgba(239,68,68,0.27)" title="2026-09-04 電子通路業 +0.82%"></td><td class="hc" style="background:rgba(239,68,68,0.01)" title="2026-09-07 電子通路業 +0.02%"></td><td class="hc" style="background:rgba(13,148,136,0.18)" title="2026-09-08 電子通路業 -0.55%"></td><td class="hc" style="background:rgba(13,148,136,0.04)" title="2026-09-09 電子通路業 -0.11%"></td><td class="hc" style="background:rgba(239,68,68,0.06)" title="2026-09-10 電子通路業 +0.17%"></td><td class="hc" style="background:rgba(13,148,136,0.31)" title="2026-09-11 電子通路業 -0.94%"></td><td class="hc" style="background:rgba(13,148,136,0.29)" title="2026-09-15 電子通路業 -0.88%"></td><td class="hc" style="background:rgba(239,68,68,0.17)" title="2026-09-16 電子通路業 +0.51%"></td><td class="hc" style="background:rgba(239,68,68,0.34)" title="2026-09-17 電子通路業 +1.02%"></td><td class="hc" style="background:rgba(239,68,68,0.53)" title="2026-09-18 電子通路業 +1.58%"></td></tr><tr><td class="hsec">綠能環保</td><td class="hc" style="background:rgba(239,68,68,0.21)" title="2026-08-26 綠能環保 +0.64%"></td><td class="hc" style="background:rgba(239,68,68,0.10)" title="2026-08-27 綠能環保 +0.29%"></td><td class="hc" style="background:rgba(13,148,136,0.20)" title="2026-08-28 綠能環保 -0.61%"></td><td class="hc" style="background:rgba(13,148,136,0.32)" title="2026-08-31 綠能環保 -0.96%"></td><td class="hc" style="background:rgba(239,68,68,0.29)" title="2026-09-01 綠能環保 +0.87%"></td><td class="hc" style="background:rgba(13,148,136,0.29)" title="2026-09-02 綠能環保 -0.86%"></td><td class="hc" style="background:rgba(13,148,136,0.27)" title="2026-09-03 綠能環保 -0.82%"></td><td class="hc" style="background:rgba(239,68,68,0.20)" title="2026-09-04 綠能環保 +0.60%"></td><td class="hc" style="background:rgba(239,68,68,0.01)" title="2026-09-07 綠能環保 +0.04%"></td><td class="hc" style="background:rgba(239,68,68,0.06)" title="2026-09-08 綠能環保 +0.17%"></td><td class="hc" style="background:rgba(239,68,68,0.01)" title="2026-09-09 綠能環保 +0.03%"></td><td class="hc" style="background:rgba(13,148,136,0.19)" title="2026-09-10 綠能環保 -0.58%"></td><td class="hc" style="background:rgba(13,148,136,0.50)" title="2026-09-11 綠能環保 -1.51%"></td><td class="hc" style="background:rgba(13,148,136,0.37)" title="2026-09-15 綠能環保 -1.12%"></td><td class="hc" style="background:rgba(239,68,68,0.07)" title="2026-09-16 綠能環保 +0.22%"></td><td class="hc" style="background:rgba(239,68,68,0.38)" title="2026-09-17 綠能環保 +1.15%"></td><td class="hc" style="background:rgba(239,68,68,0.38)" title="2026-09-18 綠能環保 +1.13%"></td></tr><tr><td class="hsec">建材營造</td><td class="hc" style="background:rgba(239,68,68,0.38)" title="2026-08-26 建材營造 +1.15%"></td><td class="hc" style="background:transparent" title="2026-08-27 建材營造 +0.00%"></td><td class="hc" style="background:rgba(13,148,136,0.34)" title="2026-08-28 建材營造 -1.01%"></td><td class="hc" style="background:rgba(13,148,136,0.16)" title="2026-08-31 建材營造 -0.48%"></td><td class="hc" style="background:rgba(239,68,68,0.03)" title="2026-09-01 建材營造 +0.10%"></td><td class="hc" style="background:rgba(13,148,136,0.12)" title="2026-09-02 建材營造 -0.35%"></td><td class="hc" style="background:rgba(239,68,68,0.04)" title="2026-09-03 建材營造 +0.11%"></td><td class="hc" style="background:rgba(239,68,68,0.16)" title="2026-09-04 建材營造 +0.48%"></td><td class="hc" style="background:rgba(13,148,136,0.14)" title="2026-09-07 建材營造 -0.43%"></td><td class="hc" style="background:rgba(239,68,68,0.04)" title="2026-09-08 建材營造 +0.11%"></td><td class="hc" style="background:rgba(239,68,68,0.17)" title="2026-09-09 建材營造 +0.50%"></td><td class="hc" style="background:rgba(13,148,136,0.22)" title="2026-09-10 建材營造 -0.66%"></td><td class="hc" style="background:rgba(13,148,136,0.32)" title="2026-09-11 建材營造 -0.97%"></td><td class="hc" style="background:rgba(13,148,136,0.36)" title="2026-09-15 建材營造 -1.08%"></td><td class="hc" style="background:rgba(239,68,68,0.17)" title="2026-09-16 建材營造 +0.50%"></td><td class="hc" style="background:rgba(239,68,68,0.40)" title="2026-09-17 建材營造 +1.19%"></td><td class="hc" style="background:rgba(239,68,68,0.55)" title="2026-09-18 建材營造 +1.65%"></td></tr>
+  </table></div>
+  <div class="legend">🐂 <b class="u">牛軍=多方</b> vs 🐻 <b class="d">熊軍=空方</b> ·
+    💥戰線位置=平均漲跌幅 · 兵力=上漲/下跌家數比 · 😵=大敗倒地 ·
+    🔥=連勝 · ⚡=漲停家數 · 👑=制霸板塊 (滑鼠停留看王牌與成交額)<br>
+    <a class="back" href="index.html">← 回主儀表板</a></div>
+  <details><summary>📋 完整數據表</summary>
+    <table><tr><th>段位</th><th>板塊</th><th>平均</th><th>上漲比</th>
+    <th>漲停</th><th>王牌</th><th>成交額</th></tr><tr><td>S</td><td>半導體業</td><td>+3.36%</td><td>95%</td><td>7</td><td>京元電子 +10.0%</td><td>4364億</td></tr><tr><td>S</td><td>資訊服務業</td><td>+2.92%</td><td>82%</td><td>1</td><td>華經 +10.0%</td><td>24億</td></tr><tr><td>A</td><td>光電業</td><td>+2.79%</td><td>83%</td><td>4</td><td>光鋐 +9.9%</td><td>677億</td></tr><tr><td>A</td><td>其他電子業</td><td>+2.28%</td><td>85%</td><td>4</td><td>汎銓 +10.0%</td><td>510億</td></tr><tr><td>A</td><td>電子零組件業</td><td>+2.17%</td><td>81%</td><td>6</td><td>宏致 +10.0%</td><td>1810億</td></tr><tr><td>A</td><td>數位雲端</td><td>+1.72%</td><td>62%</td><td>1</td><td>GOGOLOOK +9.7%</td><td>5億</td></tr><tr><td>B</td><td>建材營造</td><td>+1.65%</td><td>74%</td><td>2</td><td>欣巴巴 +10.0%</td><td>38億</td></tr><tr><td>B</td><td>電子通路業</td><td>+1.58%</td><td>91%</td><td>0</td><td>蔚華科 +6.2%</td><td>62億</td></tr><tr><td>B</td><td>鋼鐵工業</td><td>+1.30%</td><td>77%</td><td>1</td><td>佳大 +9.9%</td><td>23億</td></tr><tr><td>B</td><td>玻璃陶瓷</td><td>+1.29%</td><td>100%</td><td>0</td><td>中釉 +3.5%</td><td>21億</td></tr><tr><td>B</td><td>綠能環保</td><td>+1.13%</td><td>63%</td><td>1</td><td>聯友金屬-創 +9.9%</td><td>57億</td></tr><tr><td>B</td><td>電腦及週邊設備業</td><td>+1.13%</td><td>73%</td><td>1</td><td>歐格 +9.9%</td><td>655億</td></tr><tr><td>B</td><td>通信網路業</td><td>+0.95%</td><td>64%</td><td>0</td><td>譁裕 +6.5%</td><td>379億</td></tr><tr><td>B</td><td>電機機械</td><td>+0.94%</td><td>67%</td><td>2</td><td>高力 +10.0%</td><td>213億</td></tr><tr><td>B</td><td>生技醫療業</td><td>+0.88%</td><td>60%</td><td>1</td><td>睿生光電 +9.8%</td><td>188億</td></tr><tr><td>B</td><td>汽車工業</td><td>+0.69%</td><td>61%</td><td>2</td><td>麗清 +9.9%</td><td>21億</td></tr><tr><td>B</td><td>貿易百貨</td><td>+0.67%</td><td>56%</td><td>0</td><td>台南-KY +8.3%</td><td>8億</td></tr><tr><td>B</td><td>其他</td><td>+0.54%</td><td>60%</td><td>0</td><td>吉源-KY +3.9%</td><td>25億</td></tr><tr><td>B</td><td>居家生活</td><td>+0.49%</td><td>82%</td><td>0</td><td>峰源-KY +1.8%</td><td>4億</td></tr><tr><td>B</td><td>電器電纜</td><td>+0.48%</td><td>75%</td><td>0</td><td>禾聯碩 +5.6%</td><td>15億</td></tr><tr><td>B</td><td>食品工業</td><td>+0.45%</td><td>71%</td><td>0</td><td>興泰 +4.3%</td><td>20億</td></tr><tr><td>B</td><td>水泥工業</td><td>+0.39%</td><td>43%</td><td>0</td><td>嘉泥 +2.3%</td><td>9億</td></tr><tr><td>B</td><td>觀光餐旅</td><td>+0.23%</td><td>47%</td><td>0</td><td>新天地 +1.7%</td><td>2億</td></tr><tr><td>B</td><td>油電燃氣業</td><td>+0.22%</td><td>50%</td><td>0</td><td>台汽電 +1.7%</td><td>21億</td></tr><tr><td>B</td><td>化學工業</td><td>+0.08%</td><td>54%</td><td>0</td><td>材料*-KY +5.9%</td><td>69億</td></tr><tr><td>B</td><td>紡織纖維</td><td>+0.01%</td><td>39%</td><td>0</td><td>大宇 +2.0%</td><td>14億</td></tr><tr><td>C</td><td>運動休閒</td><td>-0.05%</td><td>56%</td><td>0</td><td>波力-KY +1.6%</td><td>14億</td></tr><tr><td>C</td><td>航運業</td><td>-0.24%</td><td>43%</td><td>0</td><td>星宇航空 +1.7%</td><td>132億</td></tr><tr><td>C</td><td>塑膠工業</td><td>-0.62%</td><td>29%</td><td>0</td><td>達新 +1.9%</td><td>244億</td></tr><tr><td>C</td><td>金融保險業</td><td>-0.70%</td><td>23%</td><td>0</td><td>安泰銀 +1.9%</td><td>453億</td></tr><tr><td>D</td><td>橡膠工業</td><td>-0.82%</td><td>36%</td><td>0</td><td>厚生 +1.7%</td><td>6億</td></tr><tr><td>D</td><td>造紙工業</td><td>-1.02%</td><td>14%</td><td>0</td><td>寶隆 +0.5%</td><td>1億</td></tr><tr><td>D</td><td>存託憑證</td><td>-1.38%</td><td>20%</td><td>0</td><td>巨騰-DR +1.5%</td><td>1億</td></tr></table></details>
+</div></body></html>
